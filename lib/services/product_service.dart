@@ -106,14 +106,14 @@ class ProductService {
       );
 
       if (response.statusCode == 204 || response.statusCode == 200) {
-        // Return updated product with incremented version
+     
         return product.copyWith(version: product.version + 1);
       } else if (response.statusCode == 404) {
         throw ProductServiceException('Product not found. It may have been deleted.');
       } else if (response.statusCode == 400) {
         throw ProductServiceException('Invalid data sent. Please try again.');
       } else if (response.statusCode == 409) {
-        // Parse conflict response to get the message from server
+     
         String serverMessage = 'The product was updated by another user. Please refresh and try again.';
         try {
           final body = jsonDecode(response.body);

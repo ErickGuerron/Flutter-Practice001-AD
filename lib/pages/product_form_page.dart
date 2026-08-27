@@ -18,18 +18,18 @@ class _ProductFormPageState extends State<ProductFormPage> {
 
   final nameController = TextEditingController();
   final priceController = TextEditingController();
-  final stockController = TextEditingController(); // Los controladores capturan la informacion.
+  final stockController = TextEditingController();
 
   final ProductService productService = ProductService();
+  bool _isLoading = false;
 
   @override
-  void dispose(){
+  void dispose() {
     nameController.dispose();
     priceController.dispose();
     stockController.dispose();
     super.dispose();
   }
-
 
   @override
   void initState() {
@@ -41,39 +41,127 @@ class _ProductFormPageState extends State<ProductFormPage> {
     }
   }
 
-
-  bool get _hasUnsavedChanges{
-      if(widget.product == null){
-        return nameController.text.trim().isNotEmpty ||
+  bool get _hasUnsavedChanges {
+    if (widget.product == null) {
+      return nameController.text.trim().isNotEmpty ||
           priceController.text.trim().isNotEmpty ||
           stockController.text.trim().isNotEmpty;
-      }
+    }
 
-      return nameController.text.trim() != widget.product!.names ||
-          priceController.text.trim() != widget.product!.price.toString() ||
-          stockController.text.trim() != widget.product!.stock.toString();
+    return nameController.text.trim() != widget.product!.names ||
+        priceController.text.trim() != widget.product!.price.toString() ||
+        stockController.text.trim() != widget.product!.stock.toString();
   }
 
-  Future<void> saveUpdateProduct() async{
+  void _showSuccessSnackbar(String message) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Row(
+          children: [
+            const Icon(Icons.check_circle, color: Colors.white, size: 20),
+            const SizedBox(width: 12),
+            Expanded(child: Text(message)),
+          ],
+        ),
+        backgroundColor: Colors.green.shade600,
+        behavior: SnackBarBehavior.floating,
+        duration: const Duration(seconds: 3),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+        margin: const EdgeInsets.all(16),
+      ),
+    );
+  }
 
-    if(!_formKey.currentState!.validate()){
+  void _showErrorSnackbar(String message) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Row(
+          children: [
+            const Icon(Icons.error_outline, color: Colors.white, size: 20),
+            const SizedBox(width: 12),
+            Expanded(child: Text(message)),
+          ],
+        ),
+        backgroundColor: Colors.red.shade600,
+        behavior: SnackBarBehavior.floating,
+        duration: const Duration(seconds: 5),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+        margin: const EdgeInsets.all(16),
+      ),
+    );
+  }
+
+  Future<void> saveUpdateProduct() async {
+    if (!_formKey.currentState!.validate()) {
       return;
     }
 
-    final product = Product(
-      id: widget.product?.id ?? 0,
-      names: nameController.text.trim(),
-      price: double.tryParse(priceController.text) ?? 0.0,
-      stock: int.tryParse(stockController.text) ?? 0,
+    setState(() {
+      _isLoading = true;
+    });
+
+    try {
+      final product = Product(
+        id: widget.product?.id ?? 0,
+        names: nameController.text.trim(),
+        price: double.tryParse(priceController.text) ?? 0.0,
+        stock: int.tryParse(stockController.text) ?? 0,
+        version: widget.product?.version ?? 1,
+      );
+
+      if (widget.product != null) {
+        final updatedProduct = await productService.updateProduct(product);
+        if (mounted) {
+          if (updatedProduct != null) {
+            _showSuccessSnackbar('Product updated successfully');
+            Navigator.pop(context, true);
+          }
+        }
+      } else {
+        await productService.createProduct(product);
+        if (mounted) {
+          _showSuccessSnackbar('Product saved successfully');
+          Navigator.pop(context, true);
+        }
+      }
+    } on ProductVersionConflictException catch (e) {
+      if (mounted) {
+        _showVersionConflictDialog(e.message);
+      }
+    } on ProductServiceException catch (e) {
+      if (mounted) {
+        _showErrorSnackbar(e.message);
+      }
+    } catch (e) {
+      if (mounted) {
+        _showErrorSnackbar('An unexpected error occurred. Please try again.');
+      }
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+      }
+    }
+  }
+
+  void _showVersionConflictDialog(String message) {
+    showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Update Conflict'),
+        content: Text(message),
+        actions: [
+          TextButton(
+            onPressed: () {
+              Navigator.pop(context, true);
+              Navigator.pop(context, true); // Close form and refresh list
+            },
+            child: const Text('OK'),
+          ),
+        ],
+      ),
     );
-    if( widget.product != null){
-      await productService.updateProduct(product);
-    } else{
-      await productService.createProduct(product); 
-    }
-    if(mounted){
-      Navigator.pop(context); // Regresa a la pagina anterior despues de guardar el producto.
-    }
   }
 
   Future<bool> _confirmExit() async {
@@ -175,40 +263,55 @@ class _ProductFormPageState extends State<ProductFormPage> {
                     TextFormField(
                       controller: stockController,
                       inputFormatters: [
-                        FilteringTextInputFormatter.digitsOnly,
+                        FilteringTextInputFormatter.deny(RegExp(r'\s')),
+                        FilteringTextInputFormatter.deny(RegExp(r'[^0-9]')),
                       ],
                       keyboardType: TextInputType.number,
                       decoration: const InputDecoration(
-                        alignLabelWithHint: true, 
+                        alignLabelWithHint: true,
                         labelText: "Stock",
                         border: OutlineInputBorder(),
+                        hintText: "Enter a whole number",
                       ),
-                      validator: (value){
-                        if(value == null || value.isEmpty){
+                      validator: (value) {
+                        if (value == null || value.isEmpty) {
                           return "Please enter a stock quantity";
                         }
+                        if (value.contains(' ')) {
+                          return "Spaces are not allowed";
+                        }
+                        if (!RegExp(r'^[0-9]+$').hasMatch(value)) {
+                          return "Only numbers are allowed";
+                        }
                         final stock = int.tryParse(value);
-
-                        if(stock == null){
+                        if (stock == null) {
                           return "Please enter a valid stock quantity";
                         }
-                        if(stock <= 0){
+                        if (stock < 0) {
                           return "Stock cannot be negative";
                         }
                         return null;
-
-
-                      }
+                      },
                     ),
                   ]
                 )   
               ),
               const SizedBox(height: 15),
-              ElevatedButton(
-                child: widget.product != null ?
-                Text("Update"):
-                Text("Save"),
-                onPressed: saveUpdateProduct,
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton(
+                  onPressed: _isLoading ? null : saveUpdateProduct,
+                  child: _isLoading
+                      ? const SizedBox(
+                          height: 20,
+                          width: 20,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            color: Colors.white,
+                          ),
+                        )
+                      : Text(widget.product != null ? "Update" : "Save"),
+                ),
               )
             ]
           )

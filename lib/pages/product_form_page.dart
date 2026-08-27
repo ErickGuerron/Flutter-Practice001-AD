@@ -254,10 +254,29 @@ class _ProductFormPageState extends State<ProductFormPage> {
                         FilteringTextInputFormatter.allow(RegExp(r'^\d+\.?\d{0,2}')),
                       ],
                       decoration: const InputDecoration(
-                        alignLabelWithHint: true, 
+                        alignLabelWithHint: true,
                         labelText: "Price",
                         border: OutlineInputBorder(),
                       ),
+                      validator: (value) {
+                        if (value == null || value.isEmpty) {
+                          return "Please enter a price";
+                        }
+                        if (value.contains(' ')) {
+                          return "Spaces are not allowed";
+                        }
+                        if (!RegExp(r'^\d+\.?\d{0,2}$').hasMatch(value)) {
+                          return "Only numbers are allowed";
+                        }
+                        final price = double.tryParse(value);
+                        if (price == null) {
+                          return "Please enter a valid price";
+                        }
+                        if (price < 0) {
+                          return "Price cannot be negative";
+                        }
+                        return null;
+                      },
                     ),
                     const SizedBox(height: 15),
                     TextFormField(

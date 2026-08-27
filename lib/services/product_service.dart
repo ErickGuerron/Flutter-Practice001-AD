@@ -24,7 +24,7 @@ class ProductVersionConflictException implements Exception {
 }
 
 class ProductService {
-  final String url = "http://localhost:5050/api/Product";
+  final String url = "http://localhost:4444/api/Product";
 
   Future<List<Product>> getProducts() async {
     try {

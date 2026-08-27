@@ -15,7 +15,7 @@ class ProductFormPage extends StatefulWidget {
 
 class _ProductFormPageState extends State<ProductFormPage> {
   final _formKey = GlobalKey<FormState>();
-  bool _allowPop = false;
+  bool _allowPop = false; // Define the maximum stock limit
 
   final nameController = TextEditingController();
   final priceController = TextEditingController();
@@ -261,6 +261,13 @@ class _ProductFormPageState extends State<ProductFormPage> {
                       keyboardType: const TextInputType.numberWithOptions(decimal: true),
                       inputFormatters: [
                         FilteringTextInputFormatter.allow(RegExp(r'^\d{1,8}\.?\d{0,2}')),
+                        TextInputFormatter.withFunction((oldValue, newValue) {
+                          final regex = RegExp(r'^\d{0,8}(\.\d{0,2})?$');
+
+                          return regex.hasMatch(newValue.text)
+                              ? newValue
+                              : oldValue;
+                        }),
                       ],
                       decoration: const InputDecoration(
                         alignLabelWithHint: true,
@@ -275,10 +282,6 @@ class _ProductFormPageState extends State<ProductFormPage> {
                         if (value.contains(' ')) {
                           return "Spaces are not allowed";
                         }
-                        // Formato (10,2): máximo 10 dígitos totales con 2 decimales
-                        if (!RegExp(r'^\d{1,8}\.?\d{0,2}$').hasMatch(value)) {
-                          return "Enter up to 10 digits with max 2 decimals";
-                        }
                         final price = double.tryParse(value);
                         if (price == null) {
                           return "Please enter a valid price";
@@ -292,9 +295,40 @@ class _ProductFormPageState extends State<ProductFormPage> {
                     const SizedBox(height: 15),
                     TextFormField(
                       controller: stockController,
+                      maxLength: 10,                                                                        
                       inputFormatters: [
                         FilteringTextInputFormatter.deny(RegExp(r'\s')),
                         FilteringTextInputFormatter.deny(RegExp(r'[^0-9]')),
+                        TextInputFormatter.withFunction((oldValue, newValue) {
+                          if (newValue.text.isEmpty) {
+                            return newValue;
+                          }
+
+                          const maxStock = 2147483647;
+                          const maxDigits = 10;
+
+                          if (newValue.text.length > maxDigits) {
+                            return oldValue;
+                          }
+
+                          final value = int.tryParse(newValue.text);
+
+                          if (value == null) {
+                            return oldValue;
+                          }
+
+                          if (value > maxStock) {
+                            final maxValue = maxStock.toString();
+
+                            return TextEditingValue(
+                              text: maxValue,
+                              selection: TextSelection.collapsed(
+                                offset: maxValue.length,
+                              ),
+                            );
+                          }
+                          return newValue;
+                        }),
                       ],
                       keyboardType: TextInputType.number,
                       decoration: const InputDecoration(

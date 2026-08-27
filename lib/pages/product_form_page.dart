@@ -2,6 +2,7 @@ import 'package:app001/models/product.dart';
 import 'package:app001/services/product_service.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter/services.dart' show LengthLimitingTextInputFormatter;
 
 class ProductFormPage extends StatefulWidget {
   final Product? product;
@@ -231,32 +232,41 @@ class _ProductFormPageState extends State<ProductFormPage> {
                     TextFormField(
                       controller: nameController,
                       inputFormatters: [
-                        FilteringTextInputFormatter.deny(RegExp(r'^\s')), 
+                        FilteringTextInputFormatter.deny(RegExp(r'^\s')),
                         FilteringTextInputFormatter.allow(RegExp(r'[a-zA-Z0-9 ]')),
+                        LengthLimitingTextInputFormatter(100),
                       ],
                       decoration: const InputDecoration(
-                        alignLabelWithHint: true, 
+                        alignLabelWithHint: true,
                         labelText: "Name",
                         border: OutlineInputBorder(),
+                        hintText: "3-100 characters",
                       ),
-                      validator: (value){
-                        if(value == null || value.isEmpty){
+                      validator: (value) {
+                        if (value == null || value.isEmpty) {
                           return "Please enter a name";
                         }
+                        if (value.trim().length < 3) {
+                          return "Name must have at least 3 characters";
+                        }
+                        if (value.trim().length > 100) {
+                          return "Name cannot exceed 100 characters";
+                        }
                         return null;
-                      }
+                      },
                     ),
                     const SizedBox(height: 15),
                     TextFormField(
                       controller: priceController,
                       keyboardType: const TextInputType.numberWithOptions(decimal: true),
                       inputFormatters: [
-                        FilteringTextInputFormatter.allow(RegExp(r'^\d+\.?\d{0,2}')),
+                        FilteringTextInputFormatter.allow(RegExp(r'^\d{1,8}\.?\d{0,2}')),
                       ],
                       decoration: const InputDecoration(
                         alignLabelWithHint: true,
                         labelText: "Price",
                         border: OutlineInputBorder(),
+                        hintText: "Max 10 digits, 2 decimals (e.g. 12345678.99)",
                       ),
                       validator: (value) {
                         if (value == null || value.isEmpty) {
@@ -265,8 +275,9 @@ class _ProductFormPageState extends State<ProductFormPage> {
                         if (value.contains(' ')) {
                           return "Spaces are not allowed";
                         }
-                        if (!RegExp(r'^\d+\.?\d{0,2}$').hasMatch(value)) {
-                          return "Only numbers are allowed";
+                        // Formato (10,2): máximo 10 dígitos totales con 2 decimales
+                        if (!RegExp(r'^\d{1,8}\.?\d{0,2}$').hasMatch(value)) {
+                          return "Enter up to 10 digits with max 2 decimals";
                         }
                         final price = double.tryParse(value);
                         if (price == null) {
@@ -290,7 +301,7 @@ class _ProductFormPageState extends State<ProductFormPage> {
                         alignLabelWithHint: true,
                         labelText: "Stock",
                         border: OutlineInputBorder(),
-                        hintText: "Enter a whole number",
+                        hintText: "Enter a whole number (integer only)",
                       ),
                       validator: (value) {
                         if (value == null || value.isEmpty) {
@@ -300,7 +311,7 @@ class _ProductFormPageState extends State<ProductFormPage> {
                           return "Spaces are not allowed";
                         }
                         if (!RegExp(r'^[0-9]+$').hasMatch(value)) {
-                          return "Only numbers are allowed";
+                          return "Only whole numbers are allowed";
                         }
                         final stock = int.tryParse(value);
                         if (stock == null) {
